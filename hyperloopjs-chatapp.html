@@ -9,12 +9,10 @@
     <script src="https://unpkg.com/react-dom@15/dist/react-dom.min.js"></script>
     <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 
-    <script src="reactrb-express.js"></script>
-
     <!-- Opal and Hyperloop -->
-    <!-- script src="https://rawgit.com/ruby-hyperloop/hyperloop-js/master/opal-compiler.min.js"></script -->
-    <!-- script src="http://cdn.opalrb.org/opal/0.10.1/external/opal-browser-0.2.0.js"></script -->
-    <!-- script src="https://rawgit.com/ruby-hyperloop/hyperloop-js/master/hyperloop.min.js"></script-->
+    <script src="https://rawgit.com/ruby-hyperloop/hyperloop-js/master/opal-compiler.min.js"></script>
+    
+    <script src="https://rawgit.com/ruby-hyperloop/hyperloop-js/master/hyperloop.min.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.3.5/marked.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
@@ -91,52 +89,45 @@
 
     <script type="text/ruby">
 
-    
-
     class ChatService
 
-        def initialize(&block)
-          @block = block
-          @messages = []
-          @user_id = nil
-          @socket = Browser::Socket.new("wss://echo.websocket.org") do |socket|
-            socket.on :message do |e|
-              data = JSON.parse(`unescape(#{JSON.parse(e.data)[:text]})`)
-              @messages << data
-              @block.call [data] if id
-            end
-          end
-        end
-
-        def login(user_id)
-          @user_id = user_id
-          @block.call @messages
-        end
-
-        def id
-          @user_id
-        end
-
-        def send(data = {})
-          @socket.send({handle: id, text: `escape(#{data.to_json})`}.to_json)
-        end
-
+      def initialize(&block)
+        @block = block
+        @messages = {"from"=>"user1", "time"=>1449089985, "message"=>"A 2 point message: \n+ point 1\n+ point 2\nGot it?"},{"from"=>"user2", "time"=>1449262785, "message"=>"message sent 8 days ago, by user 2"},{"from"=>"user3", "time"=>1449521985, "message"=>"message sent in the last week"},{"from"=>"user2", "time"=>1449608385, "message"=>"message sent **also** in the last week"},{"from"=>"user1", "time"=>1449950385, "message"=>"Was sent within the last hour!"},{"from"=>"user2", "time"=>1449952185, "message"=>"Was sent 30 minutes ago"},{"from"=>"user3", "time"=>1449953385, "message"=>"Was just sent\n\n\n\n\n\n\n\n\nwith a lot of blanks"},{"from"=>"user1", "time"=>1449953985, "message"=>"just now"}
       end
+
+      def login(user_name)
+        @user_name = user_name
+        @block.call @messages
+      end
+
+      def id
+        @user_name
+      end
+
+      def send(data = {})
+        @messages << data
+        @block.call [data]
+      end
+
+    end
+
+    
       
 
-      class ChatApp < React::Component::Base
+      class ChatApp < Hyperloop::Component
 
         before_mount do
 
           @chat_service = ChatService.new do | messages |
-            state.messages! ((state.messages || []) + messages)
+            mutate.messages ((state.messages || []) + messages)
             puts "state messages updated.  state.messages: #{state.messages}"
           end
 
         end
 
         def render
-          div do
+          DIV do
             Nav login: method(:login).to_proc
             if online?
               Messages messages: state.messages, user_id: @chat_service.id
@@ -146,7 +137,7 @@
         end
 
         def login(user_name)
-          state.messages! nil
+          mutate.messages nil
           @chat_service.login(user_name)
         end
 
@@ -158,33 +149,35 @@
 
 
 
-      class Nav < React::Component::Base
+      class Nav < Hyperloop::Component
 
         param :login, type: Proc
 
 
         before_mount do
-          state.current_user_name! nil
-          state.user_name_input! ""
+          mutate.current_user_name nil
+          mutate.user_name_input ""
         end
 
+
+
         def render
-          div.navbar.navbar_inverse.navbar_fixed_top do
-            div.container do
-              div.navbar_header do
-                div.hyperloop_icon
-                a.navbar_brand(href: "#", style: {color: "white"}) { "Hyperloop Chat Room " }
+          DIV(class: 'navbar-fixed-top navbar-inverse navbar') do
+            DIV(class: 'container') do
+              DIV(class: 'navbar-header') do
+                DIV(class: 'hyperloop-icon')
+                A(href: "#", style: {color: "white"}, class: 'navbar-brand') { "Hyperloop Chat Room " }
               end
-              div.collapse.navbar_collapse(id: "navbar") do
-                form.navbar_form.navbar_left(role: :search) do
-                  div.form_group do
-                    input.form_control(type: :text, value: state.user_name_input, placeholder: "Enter Your Handle"
+              DIV(class: 'navbar-collapse collapse', id: 'navbar') do
+                FORM(class: 'navbar-left navbar-form', role: :search) do
+                  DIV(class: 'form-group') do
+                    INPUT(class: 'form-control', type: :text, value: state.user_name_input, placeholder: "Enter Your Handle"
                     ).on(:change) do |e|
                       state.user_name_input! e.target.value
                     end.on(:key_down) do |e|
                       login! if valid_new_input? && e.key_code == 13
                     end
-                    button.btn.btn_default(type: :button) { span.glyphicon.glyphicon_log_in }.on(:click) do
+                    BUTTON(class: 'btn-default btn', type: :button) { SPAN(class: 'glyphicon glyphicon-log-in') }.on(:click) do
                       login!
                     end if valid_new_input?
                   end
@@ -199,17 +192,17 @@
         end
 
         def login!
-          state.current_user_name! state.user_name_input
+          mutate.current_user_name state.user_name_input
           params.login(state.user_name_input)
         end
       end
 
-      class Messages < React::Component::Base
+      class Messages < Hyperloop::Component
         param :messages, type: [Hash]
         param :user_id
 
         def render
-          div.container do # add the bootstrap .container class here.
+          DIV(class: 'container') do # add the bootstrap .container class here.
             params.messages.each do |message|
               Message message: message, user_id: params.user_id
             end
@@ -219,7 +212,7 @@
         
       end
 
-      class Message < React::Component::Base
+      class Message < Hyperloop::Component
         param :message, type: Hash
         param :user_id
 
@@ -227,10 +220,10 @@
         after_update :scroll_to_bottom
 
         def render
-          div.row.alternating.message do
-            div.col_sm_2 { sender }
+          DIV(class: 'row alternating message') do
+            DIV(class: 'col-sm-2') { sender }
             FormattedDiv class: "col-sm-8", markdown: params.message[:message]
-            div.col_sm_2 { formatted_time }
+            DIV(class: 'col-sm-2') { formatted_time }
           end
         end
 
@@ -259,15 +252,15 @@
 
       end
 
-      class InputBox < React::Component::Base
+      class InputBox < Hyperloop::Component
         param :chat_service, type: ChatService
 
-        before_mount { state.composition! "" }
+        before_mount { mutate.composition "" }
 
         def render
-          div.row.form_group.input_box.navbar.navbar_inverse.navbar_fixed_bottom do
-            div.col_sm_1.saytext {"Say: "}
-            textarea.col_sm_5(rows: rows, value: state.composition).on(:change) do |e|
+          DIV(class: 'row form-group input-box navbar navbar-inverse navbar-fixed-bottom') do
+            DIV(class: 'col-sm-1 saytext') {"Say: "}
+            TEXTAREA(class: 'col-sm-5', rows: rows, value: state.composition).on(:change) do |e|
               state.composition! e.target.value
             end.on(:key_down) do |e|
               send_message if is_send_key?(e)
@@ -294,14 +287,14 @@
         end
       end
 
-      class FormattedDiv < React::Component::Base
+      class FormattedDiv < Hyperloop::Component
 
         param :markdown, type: String
         collect_other_params_as :attributes
 
         def render
-          div(params.attributes) do 
-            div({dangerously_set_inner_HTML: { __html: `marked(#{params.markdown}, {sanitize: true })`}})
+          DIV(params.attributes) do 
+            DIV({dangerously_set_inner_HTML: { __html: `marked(#{params.markdown}, {sanitize: true })`}})
           end
         end
       end
@@ -311,6 +304,6 @@
   </head>
   <body>
     <!-- Tell inline reactive ruby to mount App here -->
-    <div data-reactrb-mount="ChatApp"></div>
+    <div data-hyperloop-mount="ChatApp"></div>
   </body>
 </html>
